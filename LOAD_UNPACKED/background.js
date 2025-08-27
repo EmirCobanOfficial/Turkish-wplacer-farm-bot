@@ -136,11 +136,26 @@ const sendCookie = async (callback) => {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ cookies, expirationDate: jCookie.expirationDate })
         });
-        if (!response.ok) throw new Error(`Sunucu şu durumla yanıt verdi: ${response.status}`);
-        const userInfo = await response.json();
-        if (callback) callback({ success: true, name: userInfo.name });
+
+        // Yanıtın JSON olup olmadığını kontrol et, çünkü sunucu çökebilir ve HTML döndürebilir
+        const contentType = response.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+            throw new Error(`Sunucudan beklenmedik yanıt türü: ${contentType}`);
+        }
+
+        const responseBody = await response.json();
+
+        if (!response.ok) {
+            // Sunucunun gönderdiği özel hata mesajını kullan
+            throw new Error(responseBody.error || `Sunucu şu durumla yanıt verdi: ${response.status}`);
+        }
+
+        if (callback) callback({ success: true, name: responseBody.name });
     } catch (error) {
-        if (callback) callback({ success: false, error: "Wplacer sunucusuna bağlanılamadı." });
+        const finalErrorMessage = error.message.includes('Failed to fetch')
+            ? "Wplacer sunucusuna bağlanılamadı. Botun çalıştığından emin olun."
+            : error.message; // Sunucudan gelen özel hatayı kullan
+        if (callback) callback({ success: false, error: finalErrorMessage });
     }
 };
 

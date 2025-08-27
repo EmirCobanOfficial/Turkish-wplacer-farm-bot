@@ -38,6 +38,30 @@ window.addEventListener('message', (event) => {
     }
 }, true);
 
+// 2. DOM değişikliklerini izlemek için bir MutationObserver oluşturun (yedek yöntem)
+const observer = new MutationObserver((mutations) => {
+    for (const mutation of mutations) {
+        for (const node of mutation.addedNodes) {
+            // Düğümün bir öğe olduğundan ve bir seçiciyle eşleşip eşleşmediğini kontrol edin
+            if (node.nodeType === Node.ELEMENT_NODE) {
+                const input = node.matches('input[name="cf-turnstile-response"], input[name="g-recaptcha-response"]')
+                    ? node
+                    : node.querySelector('input[name="cf-turnstile-response"], input[name="g-recaptcha-response"]');
+
+                if (input && input.value) {
+                    postToken(input.value);
+                }
+            }
+        }
+    }
+});
+
+// Gözlemciyi tüm belgeye ve alt ağacına eklenen düğümleri izleyecek şekilde yapılandırın
+observer.observe(document.documentElement, {
+    childList: true,
+    subtree: true
+});
+
 // 2. Arka plan betiğinden gelen komutları dinle
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === "reloadForToken") {

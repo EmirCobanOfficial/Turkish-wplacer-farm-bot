@@ -218,13 +218,13 @@ export function setupApi(app, context) {
     });
 
     app.post("/template", async (req, res) => {
-        const { templateName, template, coords, userIds, canBuyCharges, canBuyMaxCharges, antiGriefMode } = req.body;
+        const { templateName, template, coords, userIds, canBuyCharges, canBuyMaxCharges, antiGriefMode, priority } = req.body;
         if (!templateName || !template || !coords || !userIds || !userIds.length) return res.sendStatus(400);
         if (Object.values(templates).some(t => t.name === templateName)) {
             return res.status(409).json({ error: "Bu isimde bir şablon zaten var." });
         }
         const templateId = Date.now().toString();
-        templates[templateId] = new TemplateManager(templateName, template, coords, canBuyCharges, canBuyMaxCharges, antiGriefMode, userIds);
+        templates[templateId] = new TemplateManager(templateName, template, coords, canBuyCharges, canBuyMaxCharges, antiGriefMode, userIds, priority || 'normal');
         templates[templateId].id = templateId;
         saveTemplates();
         res.status(200).json({ id: templateId });
@@ -243,13 +243,14 @@ export function setupApi(app, context) {
         const { id } = req.params;
         if (!templates[id]) return res.sendStatus(404);
         const manager = templates[id];
-        const { templateName, coords, userIds, canBuyCharges, canBuyMaxCharges, antiGriefMode, template } = req.body;
+        const { templateName, coords, userIds, canBuyCharges, canBuyMaxCharges, antiGriefMode, priority, template } = req.body;
         manager.name = templateName;
         if (coords) manager.coords = coords;
         if (userIds) manager.userIds = userIds;
         if (canBuyCharges !== undefined) manager.canBuyCharges = canBuyCharges;
         if (canBuyMaxCharges !== undefined) manager.canBuyMaxCharges = canBuyMaxCharges;
         if (antiGriefMode !== undefined) manager.antiGriefMode = antiGriefMode;
+        if (priority) manager.priority = priority;
         if (template) {
             manager.template = template;
             manager.totalPixels = manager.template.data.flat().filter(p => p > 0).length;
@@ -266,9 +267,9 @@ export function setupApi(app, context) {
         if (!id || !templates[id]) return res.sendStatus(400);
         const manager = templates[id];
         if (req.body.running && !manager.running) {
-            manager.start().catch(error => logUserError(error, id, manager.masterName, "şablonu başlatma"));
+            manager.start();
         } else {
-            manager.running = false;
+            manager.stop();
         }
         res.sendStatus(200);
     });

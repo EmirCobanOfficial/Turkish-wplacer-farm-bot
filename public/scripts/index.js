@@ -37,6 +37,7 @@ const selectAllUsers = $("selectAllUsers");
 const canBuyMaxCharges = $("canBuyMaxCharges");
 const canBuyCharges = $("canBuyCharges");
 const antiGriefMode = $("antiGriefMode");
+const templatePriority = $("templatePriority");
 const submitTemplate = $("submitTemplate");
 const manageTemplates = $("manageTemplates");
 const templateList = $("templateList");
@@ -77,6 +78,7 @@ const proxyFormContainer = $("proxyFormContainer");
 const proxyRotationMode = $("proxyRotationMode");
 const proxyCount = $("proxyCount");
 const reloadProxiesBtn = $("reloadProxiesBtn");
+const testProxiesBtn = $("testProxiesBtn");
 const logProxyUsage = $("logProxyUsage");
 const farmTileX = $("farmTileX");
 const farmTileY = $("farmTileY");
@@ -543,7 +545,8 @@ templateForm.addEventListener('submit', async (e) => {
         userIds: selectedUsers,
         canBuyCharges: canBuyCharges.checked,
         canBuyMaxCharges: canBuyMaxCharges.checked,
-        antiGriefMode: antiGriefMode.checked
+        antiGriefMode: antiGriefMode.checked,
+        priority: templatePriority.value
     };
 
     if (!isEditMode || (isEditMode && currentTemplate.width > 0)) {
@@ -987,6 +990,8 @@ openManageTemplates.addEventListener("click", () => {
                     return users[userId] ? `${users[userId].name}#${userId}` : `Bilinmiyor#${userId}`;
                 }).join(", ");
 
+                const priorityTranslations = { high: 'Yüksek', normal: 'Normal', low: 'Düşük' };
+                const displayPriority = priorityTranslations[t.priority] || 'Normal';
                 const template = document.createElement('div');
                 template.id = id;
                 template.className = "template";
@@ -997,7 +1002,7 @@ openManageTemplates.addEventListener("click", () => {
                 const percent = Math.floor((completed / total) * 100);
 
                 const infoSpan = document.createElement('span');
-                infoSpan.innerHTML = `<b>Şablon Adı:</b> ${t.name}<br><b>Atanan Hesaplar:</b> ${userListFormatted}<br><b>Koordinatlar:</b> ${t.coords.join(", ")}<br><b>Pikseller:</b> <span class="pixel-count">${completed} / ${total}</span>`;
+                infoSpan.innerHTML = `<b>Şablon Adı:</b> ${t.name}<br><b>Atanan Hesaplar:</b> ${userListFormatted}<br><b>Koordinatlar:</b> ${t.coords.join(", ")}<br><b>Öncelik:</b> ${displayPriority}<br><b>Pikseller:</b> <span class="pixel-count">${completed} / ${total}</span>`;
                 template.appendChild(infoSpan);
 
                 const progressBarContainer = document.createElement('div');
@@ -1044,6 +1049,7 @@ openManageTemplates.addEventListener("click", () => {
                     canBuyCharges.checked = t.canBuyCharges;
                     canBuyMaxCharges.checked = t.canBuyMaxCharges;
                     antiGriefMode.checked = t.antiGriefMode;
+                    templatePriority.value = t.priority || 'normal';
 
                     document.querySelectorAll('input[name="user_checkbox"]').forEach(cb => {
                         if (t.userIds.includes(cb.value)) {
@@ -1223,6 +1229,19 @@ tx.addEventListener('blur', () => {
     });
 });
 
+if (testProxiesBtn) {
+    testProxiesBtn.addEventListener('click', async () => {
+        showConfirmation("Proxy Testi", "Tüm proxy'ler test edilecek. Bu işlem proxy sayınıza bağlı olarak biraz zaman alabilir. Devam edilsin mi?", async () => {
+            try {
+                await axios.post('/api/proxies/test');
+                showMessage("Başlatıldı", "Proxy testi arka planda başlatıldı. Tablo gerçek zamanlı olarak güncellenecektir.");
+            } catch (error) {
+                handleError(error);
+            }
+        });
+    });
+}
+
 // --- On Page Load ---
 const initializeEventSource = () => {
     const eventSource = new EventSource('/api/events');
@@ -1283,6 +1302,12 @@ const initializeEventSource = () => {
         const { id } = JSON.parse(e.data);
         const el = $(id);
         if (el) el.remove();
+    });
+    eventSource.addEventListener('proxy_status_update', (e) => {
+        // Sadece ayarlar sekmesi açıksa ve proxy'ler etkinse yeniden çiz
+        if (currentTab.id === 'settings' && proxyEnabled.checked) {
+            renderProxyStatusTable();
+        }
     });
 };
 

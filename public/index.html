@@ -125,6 +125,12 @@
                             <span class="slider"></span>
                         </span>
                     </label>
+                    <label for="templatePriority">Öncelik</label>
+                    <select id="templatePriority">
+                        <option value="high">Yüksek</option>
+                        <option value="normal" selected>Normal</option>
+                        <option value="low">Düşük</option>
+                    </select>
                     <label class="setting-toggle" for="canBuyCharges">
                         <span>Yükler biterse satın al</span>
                         <span class="switch">
@@ -286,6 +292,7 @@
                     <button type="button" id="reloadProxiesBtn" class="secondary-button">
                         Dosyadan Proxy'leri Yeniden Yükle
                     </button>
+                    <button id="testProxiesBtn" class="secondary-button">Tüm Proxy'leri Test Et</button>
                     <div id="proxyStatusContainer" style="margin-top: 20px">
                         <h4>Proxy Durumu</h4>
                         <table id="proxyStatusTable">

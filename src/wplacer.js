@@ -1,5 +1,5 @@
-import { CookieJar } from "tough-cookie";
-import { Impit } from "impit";
+import { CookieJar } from "tough-cookie"; // impit yerine tough-cookie kullanılıyor
+import { fetch } from "undici"; // impit yerine undici/fetch kullanılıyor
 import { Image, createCanvas } from "canvas";
 import { NetworkError, SuspensionError, log } from "./utils.js";
 
@@ -22,44 +22,48 @@ const pallete = { ...basic_colors, ...premium_colors };
 const colorBitmapShift = Object.keys(basic_colors).length + 1;
 
 export class WPlacer {
-    constructor(template, coords, settings, templateName) {
-        this.template = template;
-        this.templateName = templateName;
-        this.coords = coords;
-        this.settings = settings;
+    constructor(templateManager) {
         this.cookies = null;
         this.browser = null;
         this.userInfo = null;
         this.tiles = new Map();
         this.token = null;
-    };
+
+        // Global settings are always available via the dependency injection
+        this.settings = getSettings();
+
+        // If a templateManager is passed, it's for a painting task.
+        if (templateManager) {
+            this.templateManager = templateManager; // The manager instance
+            this.template = templateManager.template; // The template data object
+            this.templateName = templateManager.name;
+            this.coords = templateManager.coords;
+        } else {
+            // If no templateManager, it's a generic instance (e.g., for status checks)
+            this.templateManager = null;
+            this.template = null;
+            this.templateName = null;
+            this.coords = null;
+        }
+    }
 
     async login(cookies) {
         this.cookies = cookies;
-        let jar = new CookieJar();
-        for (const cookie of Object.keys(this.cookies)) {
-            jar.setCookieSync(`${cookie}=${this.cookies[cookie]}; Path=/`, "https://backend.wplace.live");
-        }
-
-        const impitOptions = {
-            cookieJar: jar,
-            browser: "chrome",
-            ignoreTlsErrors: true,
-            requestTimeout: getSettings().requestTimeout
-        };
-
-        const proxyUrl = getNextProxy();
-        if (proxyUrl) {
-            impitOptions.proxyUrl = proxyUrl;
-        }
-
-        this.browser = new Impit(impitOptions);
+        // 'im-pit' kaldırıldığı için, tarayıcı örneği oluşturmaya gerek yok.
+        // İstekler doğrudan 'undici' ile yapılacak.
         await this.loadUserInfo();
         return this.userInfo;
     };
 
     async loadUserInfo() {
-        const me = await this.browser.fetch("https://backend.wplace.live/me");
+        // 'browser.fetch' yerine doğrudan 'fetch' kullanılıyor.
+        const cookieHeader = Object.entries(this.cookies).map(([key, value]) => `${key}=${value}`).join('; ');
+        const me = await fetch("https://backend.wplace.live/me", {
+            headers: {
+                'Cookie': cookieHeader,
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36'
+            }
+        });
         const bodyText = await me.text();
 
         if (bodyText.trim().startsWith("<!DOCTYPE html>")) {
@@ -89,12 +93,21 @@ export class WPlacer {
     };
 
     async post(url, body) {
-        const request = await this.browser.fetch(url, {
+        const cookieHeader = Object.entries(this.cookies).map(([key, value]) => `${key}=${value}`).join('; ');
+        const request = await fetch(url, {
             method: "POST",
-            headers: { "Accept": "*/*", "Content-Type": "text/plain;charset=UTF-8", "Referer": "https://wplace.live/" },
+            headers: {
+                "Accept": "*/*",
+                "Content-Type": "text/plain;charset=UTF-8",
+                "Referer": "https://wplace.live/",
+                'Cookie': cookieHeader,
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36'
+            },
             body: JSON.stringify(body)
         });
-        const data = await request.json();
+        // Yanıtın boş olup olmadığını kontrol et
+        const text = await request.text();
+        const data = text ? JSON.parse(text) : {};
         return { status: request.status, data: data };
     };
 
@@ -114,14 +127,14 @@ export class WPlacer {
                     image.crossOrigin = "Anonymous";
                     image.onload = () => {
                         const canvas = createCanvas(image.width, image.height);
-                        const ctx = canvas.getContext("2d");
+                        const ctx = canvas.getContext("2d", { willReadFrequently: true });
                         ctx.drawImage(image, 0, 0);
                         const tileData = { width: canvas.width, height: canvas.height, data: Array.from({ length: canvas.width }, () => []) };
-                        const d = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
                         for (let x = 0; x < canvas.width; x++) {
                             for (let y = 0; y < canvas.height; y++) {
                                 const i = (y * canvas.width + x) * 4;
-                                const [r, g, b, a] = [d.data[i], d.data[i + 1], d.data[i + 2], d.data[i + 3]];
+                                const [r, g, b, a] = [imageData.data[i], imageData.data[i + 1], imageData.data[i + 2], imageData.data[i + 3]];
                                 tileData.data[x][y] = a === 255 ? (pallete[`${r},${g},${b}`] || 0) : 0;
                             }
                         }
@@ -153,6 +166,7 @@ export class WPlacer {
             incrementTotalPixelsPainted(body.colors.length);
             logStat({
                 type: 'PIXEL_PAINTED',
+                userName: this.userInfo.name,
                 userId: this.userInfo.id,
                 templateName: this.templateName,
                 count: body.colors.length
@@ -179,11 +193,12 @@ export class WPlacer {
 
     _getMismatchedPixels() {
         const [startX, startY, startPx, startPy] = this.coords;
-        const mismatched = [];
+        const repairs = [];
+        const newPixels = [];
         for (let y = 0; y < this.template.height; y++) {
             for (let x = 0; x < this.template.width; x++) {
                 const templateColor = this.template.data[x][y];
-                if (templateColor === 0) continue;
+                if (templateColor === 0) continue; // Şablonun boş kısımlarını atla
 
                 const globalPx = startPx + x;
                 const globalPy = startPy + y;
@@ -195,20 +210,21 @@ export class WPlacer {
                 const tile = this.tiles.get(`${targetTx}_${targetTy}`);
                 if (!tile || !tile.data[localPx]) continue;
 
-                const tileColor = tile.data[localPx][localPy];
+                const liveColor = tile.data[localPx][localPy];
 
-                const shouldPaint = this.settings.skipPaintedPixels
-                    ? tileColor === 0 // Atlama modu açıksa, yalnızca karo boşsa boyayın.
-                    : templateColor !== tileColor; // Aksi takdirde, renk yanlışsa boyayın.
-
-                if (templateColor > 0 && shouldPaint && this.hasColor(templateColor)) {
+                if (templateColor !== liveColor && this.hasColor(templateColor)) {
                     const neighbors = [this.template.data[x - 1]?.[y], this.template.data[x + 1]?.[y], this.template.data[x]?.[y - 1], this.template.data[x]?.[y + 1]];
                     const isEdge = neighbors.some(n => n === 0 || n === undefined);
-                    mismatched.push({ tx: targetTx, ty: targetTy, px: localPx, py: localPy, color: templateColor, isEdge });
+                    const pixelData = { tx: targetTx, ty: targetTy, px: localPx, py: localPy, color: templateColor, isEdge };
+                    if (liveColor !== 0) {
+                        repairs.push(pixelData);
+                    } else {
+                        newPixels.push(pixelData);
+                    }
                 }
             }
         }
-        return mismatched;
+        return { repairs, newPixels };
     }
 
     _sortPixelsToPaint(pixels, isOutlineTurn) {
@@ -278,27 +294,47 @@ export class WPlacer {
         await this.loadTiles();
         if (!this.token) throw new Error("Paint yöntemine token sağlanmadı.");
 
-        let mismatchedPixels = this._getMismatchedPixels();
-        if (mismatchedPixels.length === 0) return 0;
-
-        log(this.userInfo.id, this.userInfo.name, `[${this.templateName}] ${mismatchedPixels.length} adet uyumsuz piksel bulundu.`);
-
-        let pixelsToProcess = mismatchedPixels;
+        // 1. Onarılacak ve çizilecek pikselleri al
+        const { repairs, newPixels } = this._getMismatchedPixels();
+        let pixelsToProcess = [];
         let isOutlineTurn = false;
 
-        // 1. Özet Moduna Öncelik Ver
+        // 2. Anti-Grief moduna öncelik ver
+        if (this.templateManager.antiGriefMode && repairs.length > 0) {
+            log(this.userInfo.id, this.userInfo.name, `[${this.templateName}] 🛡️ Anti-Grief: ${repairs.length} adet bozulmuş piksel bulundu. Onarıma öncelik veriliyor.`);
+            pixelsToProcess = repairs;
+        } else {
+            // Onarım yoksa veya Anti-Grief kapalıysa, tüm uyumsuz pikselleri birleştir
+            pixelsToProcess = [...repairs, ...newPixels];
+        }
+
+        if (pixelsToProcess.length === 0) {
+            log(this.userInfo.id, this.userInfo.name, `[${this.templateName}] ✅ Şablonda çizilecek veya onarılacak piksel yok.`);
+            return 0;
+        }
+
+        log(this.userInfo.id, this.userInfo.name, `[${this.templateName}] ${pixelsToProcess.length} adet işlenecek piksel bulundu (${repairs.length} onarım, ${newPixels.length} yeni).`);
+
+        // 3. Anahat (Outline) moduna öncelik ver
         if (this.settings.outlineMode) {
-            const edgePixels = mismatchedPixels.filter(p => p.isEdge);
+            const edgePixels = pixelsToProcess.filter(p => p.isEdge);
             if (edgePixels.length > 0) {
+                log(this.userInfo.id, this.userInfo.name, `[${this.templateName}] ✏️ Anahat modu: ${edgePixels.length} kenar pikseline öncelik veriliyor.`);
                 pixelsToProcess = edgePixels;
                 isOutlineTurn = true;
             }
         }
 
+        // 4. Pikselleri sırala
         pixelsToProcess = this._sortPixelsToPaint(pixelsToProcess, isOutlineTurn);
 
-        // 5. Boya işini hazırlayın ve gerçekleştirin
+        // 5. Boya işini hazırla ve gerçekleştir
         const pixelsToPaint = pixelsToProcess.slice(0, Math.floor(this.userInfo.charges.count));
+        if (pixelsToPaint.length === 0) {
+            log(this.userInfo.id, this.userInfo.name, `[${this.templateName}] 🔋 Boyama için yeterli yük yok veya işlenecek piksel kalmadı.`);
+            return 0;
+        }
+
         const bodiesByTile = pixelsToPaint.reduce((acc, p) => {
             const key = `${p.tx},${p.ty}`;
             if (!acc[key]) acc[key] = { colors: [], coords: [] };
@@ -326,6 +362,7 @@ export class WPlacer {
             logStat({
                 type: 'PURCHASE',
                 userId: this.userInfo.id,
+                userName: this.userInfo.name,
                 productId: productId,
                 amount: amount
             });
@@ -340,6 +377,7 @@ export class WPlacer {
 
     async pixelsLeft() {
         await this.loadTiles();
-        return this._getMismatchedPixels().length;
-    };
+        const mismatched = this._getMismatchedPixels();
+        return mismatched.repairs.length + mismatched.newPixels.length;
+    }
 }

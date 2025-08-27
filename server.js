@@ -2,6 +2,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync, appendFileSync, cre
 import path from "node:path";
 import readline from "node:readline";
 import express from "express";
+import { fetch, ProxyAgent } from "undici";
 import cors from "cors";
 import { setupApi } from "./src/api.js";
 import { TemplateManager, initializeTemplateManager } from "./src/templateManager.js";
@@ -60,6 +61,47 @@ const loadProxies = () => {
     loadedProxies = proxies;
 };
 
+const testAllProxies = async () => {
+    if (loadedProxies.length === 0) return;
+    log('SİSTEM', 'ProxyTest', `Tüm ${loadedProxies.length} proxy test ediliyor...`);
+
+    const testProxy = async (proxy) => {
+        const proxyUrl = `${proxy.protocol}://${proxy.username && proxy.password ? `${proxy.username}:${proxy.password}@` : ''}${proxy.host}:${proxy.port}`;
+        const proxyKey = `${proxy.host}:${proxy.port}`;
+
+        proxyStatusCache[proxyKey] = { status: 'testing', latency: -1, lastChecked: Date.now() };
+        broadcastEvent('proxy_status_update', proxyStatusCache); // Update UI in real-time
+
+        const startTime = Date.now();
+        try {
+            const agent = new ProxyAgent(proxyUrl);
+            const response = await fetch("https://wplace.live/", { dispatcher: agent, signal: AbortSignal.timeout(15000) });
+
+            if (response.ok) {
+                proxyStatusCache[proxyKey] = { status: 'healthy', latency: Date.now() - startTime, lastChecked: Date.now() };
+            } else {
+                proxyStatusCache[proxyKey] = { status: 'unhealthy', latency: -1, lastChecked: Date.now() };
+            }
+        } catch (error) {
+            proxyStatusCache[proxyKey] = { status: 'unhealthy', latency: -1, lastChecked: Date.now() };
+        }
+        broadcastEvent('proxy_status_update', proxyStatusCache);
+    };
+
+    // Run tests concurrently with a limit
+    const concurrencyLimit = 10;
+    const queue = [...loadedProxies];
+    const workers = Array(concurrencyLimit).fill(null).map(async () => {
+        while (queue.length > 0) {
+            const proxy = queue.shift();
+            if (proxy) await testProxy(proxy);
+        }
+    });
+
+    await Promise.all(workers);
+    saveProxyStatus();
+    log('SİSTEM', 'ProxyTest', 'Tüm proxy testleri tamamlandı.');
+};
 
 let nextProxyIndex = 0;
 const getNextProxy = () => {
@@ -106,7 +148,8 @@ const saveTemplates = () => {
         templatesToSave[id] = {
             name: t.name, template: t.template, coords: t.coords,
             canBuyCharges: t.canBuyCharges, canBuyMaxCharges: t.canBuyMaxCharges,
-            antiGriefMode: t.antiGriefMode, userIds: t.userIds
+            antiGriefMode: t.antiGriefMode, userIds: t.userIds,
+            priority: t.priority
         };
     }
     saveJSON("templates.json", templatesToSave);
@@ -348,6 +391,38 @@ const updateUserStatuses = async () => {
     scheduleNextStatusUpdate();
 };
 
+const mainScheduler = async () => {
+    log('SİSTEM', 'Zamanlayıcı', 'Merkezi görev zamanlayıcı başlatıldı.');
+    while (true) {
+        try {
+            const now = Date.now();
+            const runningTemplates = Object.values(templates).filter(t =>
+                t.running &&
+                !t.isTicking &&
+                (!t.waitUntil || now >= t.waitUntil)
+            );
+
+            if (runningTemplates.length > 0) {
+                const priorityOrder = { 'high': 1, 'normal': 2, 'low': 3 };
+                runningTemplates.sort((a, b) => (priorityOrder[a.priority] || 2) - (priorityOrder[b.priority] || 2));
+
+                const availableSlots = currentSettings.templateConcurrency - activePaintingTasks;
+
+                if (availableSlots > 0) {
+                    const tasksToStart = Math.min(runningTemplates.length, availableSlots);
+                    for (let i = 0; i < tasksToStart; i++) {
+                        const template = runningTemplates[i];
+                        template.tick(); // Don't await, let them run concurrently
+                    }
+                }
+            }
+        } catch (e) {
+            log('SİSTEM', 'Zamanlayıcı', `Ana döngüde hata: ${e.message}`, e);
+        }
+        await sleep(1000); // Check for tasks every second.
+    }
+};
+
 
 // --- Sunucu Başlatma ---
 (async () => {
@@ -381,7 +456,7 @@ const updateUserStatuses = async () => {
     });
     initializeFarmManager({
         users, userStates, currentSettings, logUserError,
-        saveUsers, TokenManager, isUserBusy, lockUser, unlockUser
+        saveUsers, TokenManager, isUserBusy, lockUser, unlockUser, sendDiscordNotification
     });
     const apiContext = {
         users, saveUsers, userStates, templates, saveTemplates, getSanitizedTemplates,
@@ -389,7 +464,7 @@ const updateUserStatuses = async () => {
         TokenManager, broadcastEvent, loadProxies, getLoadedProxies: () => loadedProxies, proxyStatusCache, saveProxyStatus,
         botStatus, statusUpdateTimeout, sendDiscordNotification,
         get botStartTime() { return botStartTime; },
-        get totalPixelsPainted() { return totalPixelsPainted; },
+        get totalPixelsPainted() { return totalPixelsPainted; }, testAllProxies,
         isUserBusy, lockUser, unlockUser, statsLogPath, sseClients
     };
     // Tüm çiftlik modlarını sıfırlayın ve önceki oturumun durumlarını başlatın.
@@ -407,7 +482,7 @@ const updateUserStatuses = async () => {
     for (const id in loadedTemplates) {
         const t = loadedTemplates[id];
         if (t.userIds.every(uid => users[uid])) {
-            templates[id] = new TemplateManager(t.name, t.template, t.coords, t.canBuyCharges, t.canBuyMaxCharges, t.antiGriefMode, t.userIds);
+            templates[id] = new TemplateManager(t.name, t.template, t.coords, t.canBuyCharges, t.canBuyMaxCharges, t.antiGriefMode, t.userIds, t.priority || 'normal');
             templates[id].id = id;
         } else {
             console.warn(`⚠️ Şablon "${t.name}" atanan kullanıcı(lar) artık mevcut olmadığı için yüklenmedi.`);
@@ -431,6 +506,9 @@ const updateUserStatuses = async () => {
     app.listen(port, host, () => {
         console.log(`✅ Sunucu dinleme http://localhost:${port}`);
         console.log(`   Başlamak için tarayıcınızda web kullanıcı arayüzünü açın`);
+
+        // Merkezi zamanlayıcıyı başlat
+        mainScheduler();
 
         // İlk durum kontrolü, ardından aralık ayarlama
         updateUserStatuses();
