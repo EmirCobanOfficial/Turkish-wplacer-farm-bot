@@ -1,0 +1,359 @@
+<!doctype html>
+<html>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <link rel="icon" type="image/x-icon" href="icons/favicon.png" />
+        <link rel="stylesheet" href="styles/index.css" />
+        <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+        <title>wplacer</title>
+    </head>
+
+    <body>
+        <div class="container">
+            <h1><img src="icons/favicon.png" />wplacer</h1>
+
+            <div id="main">
+                <button id="openManageUsers" class="primary-button">
+                    <img src="icons/manageUsers.svg" />Kullanıcıları Yönet
+                </button>
+                <button id="openAddTemplate" class="primary-button">
+                    <img src="icons/addTemplate.svg" />Şablon Ekle
+                </button>
+                <button id="openManageTemplates" class="primary-button">
+                    <img src="icons/manageTemplates.svg" />Şablonları Yönet
+                </button>
+                <button id="openSettings" class="primary-button"><img src="icons/settings.svg" />Ayarlar</button>
+                <button id="openDashboard" class="primary-button">
+                    <img src="icons/dashboard.svg" />Gösterge paneli
+                </button>
+            </div>
+
+            <div id="manageUsers" style="display: none">
+                <h2>Kullanıcı Ekle/Yönet</h2>
+                <form id="userForm">
+                    <label for="jcookie">JWT Çerezi (j)</label>
+                    <input type="password" id="jcookie" required />
+                    <label for="scookie">Oturum Çerezi (çerezleri) [isteğe bağlı]</label>
+                    <input type="password" id="scookie" />
+                    <button type="submit" id="submitUser" class="primary-button">
+                        <img src="icons/addUser.svg" />Kullanıcı Ekle
+                    </button>
+                </form>
+
+                <h2 class="section-title" id="manageUsersTitle">Mevcut Kullanıcılar</h2>
+                <div class="info-box stats-summary">
+                    <div><strong>Son Kontrol Süresi:</strong> <span id="lastCheckDuration">N/A</span></div>
+                    <div><strong>Sonraki Kontrol:</strong> <span id="nextCheckIn">--:--</span></div>
+                </div>
+                <div id="chargeSummary">
+                    <b>Toplam Kullanılabilir Ücretler:</b> <span id="totalCharges">?</span> |
+                    <b>Toplam Maksimum Ücretler:</b>
+                    <span id="totalMaxCharges">?</span>
+                </div>
+                <button id="checkUserStatus" class="primary-button">
+                    <img src="icons/check.svg" />Hesap Durumunu Kontrol Et
+                </button>
+                <div id="userList"></div>
+
+                <button onclick="changeTab(main);" class="secondary-button">
+                    <img src="icons/return.svg" />Geri Dön
+                </button>
+            </div>
+
+            <div id="addTemplate" style="display: none">
+                <h2 id="templateFormTitle">Şablon Ekle</h2>
+                <div class="info-box">
+                    <b>İpucu:</b> En iyi sonuçları elde etmek için, görüntünüzü
+                    <a
+                        href="https://pepoafonso.github.io/color_converter_wplace/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        >wplace renk dönüştürücü</a
+                    >
+                    ilk!
+                </div>
+                <button id="convert" class="primary-button" onclick="document.getElementById('convertInput').click()">
+                    <img src="icons/convert.svg" />Görüntüyü Dönüştür
+                </button>
+                <div id="details" style="display: none">
+                    <b>Boyut:</b> <span id="size"></span> | <b>Gerekli Yükler:</b> <span id="ink"></span>
+                    <div id="premiumWarning" class="warning-box" style="display: none"></div>
+                    <canvas id="templateCanvas"></canvas>
+                    <div class="preview-controls">
+                        <button id="previewCanvasButton" class="secondary-button">Tuvali Önizle</button>
+                        <label for="previewBorder">Kenarlık Önizlemesi:</label>
+                        <input type="text" inputmode="numeric" pattern="[0-9]*" id="previewBorder" value="0" />
+                    </div>
+                    <canvas id="previewCanvas" style="display: none"></canvas>
+                </div>
+                <form id="templateForm">
+                    <input type="file" style="display: none" accept="image/png" id="convertInput" />
+                    <label for="templateName">Şablon Adı</label>
+                    <input type="text" id="templateName" placeholder="Buraya akılda kalıcı bir isim girin" required />
+                    <label>Koordinatlar</label>
+                    <div class="coordinate-grid">
+                        <input type="text" inputmode="numeric" pattern="[0-9]*" id="tx" placeholder="Alan X" required />
+                        <input type="text" inputmode="numeric" pattern="[0-9]*" id="ty" placeholder="Alan Y" required />
+                        <input
+                            type="text"
+                            inputmode="numeric"
+                            pattern="[0-9]*"
+                            id="px"
+                            placeholder="Pixel X"
+                            required
+                        />
+                        <input
+                            type="text"
+                            inputmode="numeric"
+                            pattern="[0-9]*"
+                            id="py"
+                            placeholder="Pixel Y"
+                            required
+                        />
+                    </div>
+                    <label>Kullanıcılar</label>
+                    <div id="userSelectList"></div>
+                    <button type="button" id="selectAllUsers" class="secondary-button">
+                        <img src="icons/manageUsers.svg" />Tümünü Seç
+                    </button>
+
+                    <label class="setting-toggle" for="canBuyMaxCharges">
+                        <span>Maksimum yük yükseltmesi satın al</span>
+                        <span class="switch">
+                            <input id="canBuyMaxCharges" name="canBuyMaxCharges" type="checkbox" />
+                            <span class="slider"></span>
+                        </span>
+                    </label>
+                    <label class="setting-toggle" for="canBuyCharges">
+                        <span>Yükler biterse satın al</span>
+                        <span class="switch">
+                            <input id="canBuyCharges" name="canBuyCharges" type="checkbox" />
+                            <span class="slider"></span>
+                        </span>
+                    </label>
+                    <label class="setting-toggle" for="antiGriefMode">
+                        <span>Anti-Grief modunu etkinleştir</span>
+                        <span class="switch">
+                            <input id="antiGriefMode" name="antiGriefMode" type="checkbox" />
+                            <span class="slider"></span>
+                        </span>
+                    </label>
+
+                    <button type="submit" id="submitTemplate" class="primary-button">
+                        <img src="icons/addTemplate.svg" />Şablon Ekle
+                    </button>
+                </form>
+                <button onclick="changeTab(main); resetTemplateForm();" class="secondary-button">
+                    <img src="icons/return.svg" />Geri dön
+                </button>
+            </div>
+
+            <div id="manageTemplates" style="display: none">
+                <h2>Şablonları Yönet</h2>
+                <div class="template-actions-all">
+                    <button id="startAll" class="primary-button"><img src="icons/playAll.svg" />Tümünü Başlat</button>
+                    <button id="stopAll" class="secondary-button"><img src="icons/pauseAll.svg" />Tümünü Durdur</button>
+                </div>
+                <div id="templateList"></div>
+                <button onclick="changeTab(main);" class="secondary-button">
+                    <img src="icons/return.svg" />Geri dön
+                </button>
+            </div>
+
+            <div id="settings" style="display: none">
+                <h2>Ayarlar</h2>
+
+                <div class="info-box stats-summary">
+                    <div><strong>Bot Çalışma Süresi:</strong> <span id="botUptime">--:--:--</span></div>
+                    <div><strong>Toplam Boyanan Piksel Sayısı:</strong> <span id="totalPixelsStat">0</span></div>
+                </div>
+
+                <label for="drawingDirectionSelect">Çizim Yönü</label>
+                <select id="drawingDirectionSelect">
+                    <option value="ttb">Yukarıdan aşağıya</option>
+                    <option value="btt">Aşağıdan Yukarıya</option>
+                    <option value="ltr">Soldan sağa</option>
+                    <option value="rtl">Sağdan sola</option>
+                </select>
+
+                <label for="drawingOrderSelect">Çizim Sırası</label>
+                <select id="drawingOrderSelect">
+                    <option value="linear">Doğrusal</option>
+                    <option value="random">Rastgele Pikseller</option>
+                    <option value="randomColor">Rastgele Renk</option>
+                    <option value="color">Renk Renk</option>
+                </select>
+
+                <label class="setting-toggle" for="outlineMode">
+                    <span>Anahat modunu etkinleştir</span>
+                    <span class="switch">
+                        <input id="outlineMode" name="outlineMode" type="checkbox" />
+                        <span class="slider"></span>
+                    </span>
+                </label>
+                <label class="setting-toggle" for="interleavedMode">
+                    <span>Geçişmeli modu etkinleştir</span>
+                    <span class="switch">
+                        <input id="interleavedMode" name="interleavedMode" type="checkbox" />
+                        <span class="slider"></span>
+                    </span>
+                </label>
+                <label class="setting-toggle" for="skipPaintedPixels">
+                    <span>Diğerlerinin boyadığı pikselleri atla</span>
+                    <span class="switch">
+                        <input id="skipPaintedPixels" name="skipPaintedPixels" type="checkbox" />
+                        <span class="slider"></span>
+                    </span>
+                </label>
+                <label class="setting-toggle" for="turnstileNotifications">
+                    <span>Turnstile için masaüstü bildirimlerini etkinleştir</span>
+                    <span class="switch">
+                        <input id="turnstileNotifications" name="turnstileNotifications" type="checkbox" />
+                        <span class="slider"></span>
+                    </span>
+                </label>
+
+                <label for="accountCooldown">Hesap Bekleme Süresi (saniye)</label>
+                <input type="number" id="accountCooldown" min="0" value="20" />
+                <label for="purchaseCooldown">Satın Alma Bekleme Süresi (saniye)</label>
+                <input type="number" id="purchaseCooldown" min="0" value="5" />
+                <label for="accountCheckCooldown">Hesap Kontrol Aralığı (saniye)</label>
+                <input type="number" id="accountCheckCooldown" min="0" value="0" />
+                <label for="dropletReserve">Damlacık Rezervi</label>
+                <input type="number" id="dropletReserve" min="0" value="0" />
+                <label for="antiGriefStandby">Anti-Grief Bekleme Süresi (dakika)</label>
+                <input type="number" id="antiGriefStandby" min="1" value="10" />
+                <label for="requestTimeout">İstek Zaman Aşımı (ms)</label>
+                <input type="number" id="requestTimeout" min="10000" step="1000" value="30000" />
+                <label for="templateConcurrency">Şablon Eşzamanlılığı</label>
+                <input type="number" id="templateConcurrency" min="1" max="25" value="5" />
+
+                <label for="statusCheckInterval">Durum Kontrol Aralığı (dakika)</label>
+                <input type="number" id="statusCheckInterval" min="1" value="5" />
+
+                <label for="chargeThreshold">Yük Eşiği (%)</label>
+                <input type="number" id="chargeThreshold" min="0" max="100" value="50" />
+
+                <div class="settings-section">
+                    <h3>Çiftlik Ayarları</h3>
+                    <div class="setting">
+                        <label for="farmTileX">Farm Alanı X:</label>
+                        <input type="number" id="farmTileX" value="0" />
+                        <small>Farm yapılacak alanın X koordinatı.</small>
+                    </div>
+                    <div class="setting">
+                        <label for="farmTileY">Farm Alanı Y:</label>
+                        <input type="number" id="farmTileY" value="0" />
+                        <small>Farm yapılacak alanın Y koordinatı.</small>
+                    </div>
+                </div>
+
+                <h2 class="section-title">Bildirimler</h2>
+                <label for="discordWebhookUrl">Discord Webhook URL</label>
+                <input type="text" id="discordWebhookUrl" placeholder="Devre dışı bırakmak için boş bırakın" />
+
+                <h2 class="section-title">Proxy Ayarları</h2>
+                <label class="setting-toggle" for="proxyEnabled">
+                    <span>Proxy'leri Etkinleştir</span>
+                    <span class="switch">
+                        <input id="proxyEnabled" name="proxyEnabled" type="checkbox" />
+                        <span class="slider"></span>
+                    </span>
+                </label>
+                <div id="proxyFormContainer" style="display: none">
+                    <p class="info-box" style="text-align: left">
+                        Proxy'ler <code>proxies.txt</code> dosyanızdaki <code>/data</code> klasörüne ekleyin. Her satıra
+                        bir proxy ekleyin. <code>protocol://user:pass@host:port</code>. Yüksek kaliteli proxy'leri
+                        adresinden edinebilirsiniz.
+                        <a href="https://dataimpulse.com/?aff=199137" target="_blank" rel="noopener noreferrer"
+                            >DataImpulse</a
+                        >.
+                    </p>
+                    <label class="setting-toggle" for="logProxyUsage">
+                        <span>Proxy Bağlantılarını Günlüğe Kaydet</span>
+                        <span class="switch">
+                            <input id="logProxyUsage" name="logProxyUsage" type="checkbox" />
+                            <span class="slider"></span>
+                        </span>
+                    </label>
+                    <label for="proxyRotationMode">Döngü Modu</label>
+                    <select id="proxyRotationMode">
+                        <option value="sequential">Sıralı</option>
+                        <option value="random">Rastgele</option>
+                    </select>
+                    <div id="proxyCount" class="info-box" style="text-align: center; margin-top: 10px"></div>
+                    <button type="button" id="reloadProxiesBtn" class="secondary-button">
+                        Dosyadan Proxy'leri Yeniden Yükle
+                    </button>
+                    <div id="proxyStatusContainer" style="margin-top: 20px">
+                        <h4>Proxy Durumu</h4>
+                        <table id="proxyStatusTable">
+                            <thead>
+                                <tr>
+                                    <th>Sunucu</th>
+                                    <th>Durum</th>
+                                    <th>Gecikme</th>
+                                    <th>Son Kontrol</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Satırlar JavaScript ile eklenecek -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <button onclick="changeTab(main);" class="secondary-button">
+                    <img src="icons/return.svg" />Geri dön
+                </button>
+            </div>
+
+            <div id="dashboard" style="display: none">
+                <div class="dashboard-header">
+                    <h2>Gösterge paneli</h2>
+                    <button id="refreshDashboardBtn" class="secondary-button">
+                        <img src="icons/refresh.svg" />Yenile
+                    </button>
+                </div>
+                <div class="chart-container">
+                    <h3>Zamanla Boyanan Pikseller</h3>
+                    <canvas id="pixelsOverTimeChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <h3>En Çok Katkı Sağlayan Kullanıcılar</h3>
+                    <canvas id="userContributionChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <h3>Kullanıcı Tarafından Harcanan Damlacıklar</h3>
+                    <canvas id="dropletsSpentChart"></canvas>
+                </div>
+                <button onclick="changeTab(main);" class="secondary-button">
+                    <img src="icons/return.svg" />Geri dön
+                </button>
+            </div>
+
+            <p class="credits">
+                Yapımcı
+                <a href="https://github.com/EmirCobanOfficial"
+                    >Emir Çoban <img src="icons/github.svg" />Tarafından yapılmıştır</a
+                >
+            </p>
+        </div>
+
+        <div id="messageBoxOverlay" class="hidden">
+            <div id="messageBox">
+                <h3 id="messageBoxTitle"></h3>
+                <p id="messageBoxContent"></p>
+                <div class="message-box-buttons">
+                    <button id="messageBoxCancel" class="secondary-button">İptal</button>
+                    <button id="messageBoxConfirm" class="primary-button">Tamam</button>
+                </div>
+            </div>
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+        <script src="scripts/index.js"></script>
+    </body>
+</html>

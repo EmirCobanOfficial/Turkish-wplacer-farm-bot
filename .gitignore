@@ -1,0 +1,10 @@
+package-lock.json
+node_modules/
+users.json
+templates.json
+*.log
+settings.json
+ExtensionTesting/
+*.png
+CONVERTED/
+data/

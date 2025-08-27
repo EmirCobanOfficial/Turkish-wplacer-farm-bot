@@ -1,0 +1,80 @@
+<h1 align="center"><p style="display: inline-flex; align-items: center; gap: 0.25em"><img style="width: 1.5em; height: 1.5em;" src="public/icons/favicon.png">wplacer</p></h1>
+
+<p align="center"><img src="https://img.shields.io/github/package-json/v/luluwaffless/wplacer">
+<a href="LICENSE"><img src="https://img.shields.io/github/license/luluwaffless/wplacer"></a>
+<a href="https://discord.gg/qbtcWrHJvR"><img src="https://img.shields.io/badge/Destek-gray?style=flat&logo=Discord&logoColor=white&logoSize=auto&labelColor=5562ea"></a>
+<a href="README.md"><img src="https://img.shields.io/badge/translation-english-red"></a>
+<a href="LEIAME.md"><img src="https://img.shields.io/badge/tradução-português-green"></a>
+<a href="LISEZMOI.md"><img src="https://img.shields.io/badge/traduction-français-blue"></a></p>
+
+[wplace.live](https://wplace.live/) için büyük ölçüde güncellenmiş, otomatik çizim yapan bir bot.
+
+## Özellikler ✅
+
+- **Basit ve kullanımı kolay web arayüzü:** Kullanıcıları ve şablonları yönetmek için.
+- **Gelişmiş Çoklu Hesap Sistemi:** Şablonları aynı anda birden fazla kullanıcıyla çalıştırın. Sistem, verimliliği en üst düzeye çıkarmak için en fazla şarja sahip kullanıcıları akıllıca önceliklendirir.
+- **Çoklu Çizim Modları:** Farklı şablonlar için yaklaşımınızı optimize etmek amacıyla çeşitli çizim stratejileri (Yukarıdan Aşağıya, Kenarlardan Önce, Rastgele Renk vb.) arasından seçim yapın.
+- **Otomatik Yükseltme Satın Alma:** Etkinleştirilirse, bot hesaplarınızda yeterli damlacık (droplet) olduğunda, şarjları bittiğinde otomatik olarak maksimum şarj yükseltmeleri veya ekstra şarjlar satın alır.
+- **Hesap Durumu Kontrolcüsü:** "Kullanıcıları Yönet" sekmesindeki bir araç, hesaplarınızın çerezlerinin (cookie) hala geçerli olup olmadığını hızlıca kontrol etmenizi sağlar.
+- **Gelişmiş Şablon Kontrolleri:** Bir şablonu yeniden başlatma, resmini değiştirme veya anında duraklatma gibi seçenekler yönetimi daha esnek hale getirir ve şablonun durumu hakkında size gerçek zamanlı güncellemeler sunar.
+- **Otomatik Captcha (Turnstile) Jetonu Yönetimi:** Turnstile yönetimi, botu sürekli izleme ihtiyacını büyük ölçüde azaltır.
+- **Masaüstü Bildirimleri:** Program, yeni bir Turnstile jetonuna ihtiyaç duyduğunda bir masaüstü bildirimi gönderir, böylece sürekli konsolu kontrol etmek zorunda kalmazsınız.
+
+## Kurulum ve Kullanım 💻
+
+[Video Eğitimi (İngilizce)](https://www.youtube.com/watch?v=YR978U84LSY)
+
+### Gereksinimler:
+
+- [Node.js ve NPM](https://nodejs.org/en/download)
+- [git](https://git-scm.com/downloads) (isteğe bağlı, ancak önerilir)
+- [Tampermonkey](https://www.tampermonkey.net/) (isteğe bağlı, sadece Blue Marble script'i ile koordinat bulmak için)
+
+### Kurulum:
+
+1. Tarayıcınızın eklentiler sayfasına gidin, geliştirici modunu açın, "Paketlenmemiş uzantı yükle"ye basın ve wplacer ile birlikte gelen `LOAD_UNPACKED` klasörünü seçerek uzantıyı kurun. Bu işlemi, bot ile kullanmak istediğiniz her hesap için ilgili tarayıcıda yapın.
+2. Depoyu git kullanarak klonlayın (`git clone https://github.com/luluwaffless/wplacer.git`) veya ZIP dosyasını doğrudan GitHub'dan indirin (önerilmez).
+3. Terminalde, proje dizinine gidin ve `npm i` komutuyla bağımlılıkları yükleyin.
+
+- İsterseniz, bir `.env` dosyası oluşturarak yerel sunucunun ana makinesini (host) ve portunu değiştirebilirsiniz.
+
+### Kullanım:
+
+1. Botu başlatmak için terminalde `npm start` komutunu çalıştırın.
+2. Konsolda yazan URL'yi (genellikle `http://127.0.0.1/`) tarayıcınızda açın.
+3. Uzantının kurulu olduğu her tarayıcı penceresinde, wplace.live sitesinde hesabınıza giriş yapın. Hesabınız yöneticide görünmezse, wplacer'a manuel olarak göndermek için uzantıya tıklayabilirsiniz.
+4. Çizim şablonlarınızı oluşturmak için "Şablon Ekle" sayfasına gidin.
+    - Koordinatlar (`Tile X/Y`, `Pixel X/Y`), resminizin sol üst köşesi içindir. Bu bilgileri, wplace.live'da bir piksele tıklayıp Geliştirici Araçları'nın Ağ (Network) sekmesindeki `pixel` isteğini inceleyerek bulabilirsiniz. Alternatif olarak, bir pikselin koordinatlarını görmek için Blue Marble kullanıcı betiğini (Tampermonkey kullanarak) kullanabilirsiniz.
+    - Tek bir şablona birden fazla kullanıcı atayabilirsiniz.
+5. Son olarak, "Şablonları Yönet" sayfasına gidin ve çizime başlamak için herhangi bir şablonun yanındaki "Başlat" düğmesine tıklayın.
+    - Bot, boyama için gereken Turnstile jetonunu yenilemek amacıyla zaman zaman wplace.live üzerindeki aktif bot pencerelerinden birini yenileyecektir.
+
+## Notlar 📝
+
+> [!IMPORTANT]
+> **Tarayıcı Profilleri ve Sekmeler Açık Kalmalı:** Botun, özellikle otomatik CAPTCHA (Turnstile) çözme ve çerez (cookie) yenileme işlevleri için, kullandığınız hesapların bulunduğu tüm tarayıcı profillerinin **sürekli açık olması** gerekir. Ayrıca, her bir açık profilde **en az bir adet `wplace.live` sekmesinin de açık olması** zorunludur. Pencereleri simge durumuna küçültebilirsiniz, ancak hem profillerin hem de sekmelerin açık kalması önemlidir.
+
+> [!CAUTION]
+> Bu bot wplace.live ile ilişkili değildir ve kullanımı site kurallarına aykırı olabilir. Geliştiriciler, hesaplarınıza uygulanabilecek herhangi bir cezadan sorumlu değildir. Riski size aittir.
+
+> [!NOTE]
+> **Cloudflare ve IP Hız Sınırları Hakkında:** Bot, zaman zaman wplace.live'ın güvenlik sağlayıcısı olan Cloudflare tarafından engellenebilir. Bu durum genellikle tek bir IP adresinden çok fazla istek gönderildiğinde meydana gelir. Bu sorunun en etkili çözümü, özellikle birden fazla hesap çalıştırırken şiddetle tavsiye edilen **proxy kullanmaktır**.
+
+> [!WARNING]
+> **Hesabı Manuel Olarak Kullanmaktan Kaçının:** Bot bir hesabı aktif olarak şablon çizmek veya farm yapmak için kullanırken, aynı hesapla tarayıcı üzerinden manuel olarak piksel yerleştirmekten kaçının. Bu durum, botun bekleme süresi (cooldown) takibini bozarak hatalara ve verimsizliğe yol açabilir. Hesabınızda manuel bir işlem yapmanız gerekiyorsa, önce bot arayüzünden ilgili şablonu veya farm modunu durdurmanız önerilir.
+
+## Sık Karşılaşılan Sorunlar
+
+- **`Request timeout ... exceeded` Hatası:** Bu hata, internet bağlantınızın yavaş olması veya wplace.live sunucularının yoğun olması nedeniyle botun zamanında yanıt alamadığı anlamına gelir.
+    - **Çözüm:** Web arayüzündeki **Settings > Advanced Settings > Request Timeout (ms)** değerini artırmayı deneyin (örneğin, `60000`).
+
+- **`Cloudflare interruption detected` veya `(401) Unauthorized` Hatası:** Bu, IP adresinizin çok fazla istek gönderdiği için hız sınırına takıldığını gösterir.
+    - **Çözüm:** En etkili çözüm, **Settings > Proxy Settings** bölümünden proxy ekleyip etkinleştirmektir. Bu, özellikle birden fazla hesap kullanırken şiddetle tavsiye edilir.
+
+### Katkıda Bulunanlar 🙏
+
+- EmirCobanOffical
+
+Ve harika katkıda bulunanlarımıza!
+
+### Lisans 📜

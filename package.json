@@ -1,0 +1,23 @@
+{
+  "name": "wplacer",
+  "version": "4.1.0",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node --env-file=.env ."
+  },
+  "dependencies": {
+    "canvas": "^3.2.0",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "impit": "0.5.3",
+    "tough-cookie": "^6.0.0"
+  },
+  "engines": {
+    "node": ">=22.0.0",
+    "npm": ">=10.0.0"
+  },
+  "devDependencies": {
+    "prettier": "^3.6.2"
+  }
+}
