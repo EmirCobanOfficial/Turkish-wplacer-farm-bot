@@ -1,7 +1,7 @@
 <div align="center">
 
 <h1>
-  <img src="public/icons/favicon.png" width="24" height="24" style="vertical-align: middle;"/>
+  <img src="public/icons/favicon.png" width="28" height="28" style="vertical-align: middle;"/>
   wplacer
 </h1>
 
@@ -16,6 +16,7 @@
 
 </div>
 
+---
 
 [wplace.live](https://wplace.live/) için büyük ölçüde güncellenmiş, otomatik çizim yapan bir bot.
 
